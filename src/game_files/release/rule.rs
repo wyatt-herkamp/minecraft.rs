@@ -4,6 +4,7 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::fmt;
 use std::fmt::Write;
+use log::warn;
 
 /// The Rule Type
 #[derive(Deserialize, Debug)]
@@ -42,16 +43,62 @@ pub enum RuleOS {
 #[derive(Debug)]
 pub struct Rule {
     /// What is to happen on if the requirements are met
-    action: RuleType,
+    pub action: RuleType,
     /// The Rule Requirements
-    /// As of now(05/12/2022) only one RuleRequirement exists per option. However, I am prepping for the worst
-    requirements: Vec<RuleRequirement>,
+    pub requirement: RuleRequirement,
+}
+
+impl Rule {
+    pub fn should_do(&self, os: &str, arch: &str, version: Option<String>, features_enabled: Vec<String>) -> bool {
+        self.should_do_os(os, arch, version) && self.should_do_feature(features_enabled)
+    }
+    pub fn should_do_os(&self, os: &str, arch: &str, version: Option<String>) -> bool {
+        if let RuleRequirement::OS(os_rules) = &self.requirement {
+            let mut os_name_match = false;
+            let mut os_arch_match = false;
+            let mut os_version_match = true;
+            for os_rule in os_rules.iter() {
+                match &os_rule {
+                    RuleOS::Name(name) => {
+                        os_name_match = name.eq(os)
+                    }
+                    RuleOS::Arch(value) => {
+                        os_arch_match = arch.eq(value)
+                    }
+                    RuleOS::Version(value) => {
+                        if let Some(requirement) = version.as_ref() {
+                            warn!("Version parsing from the manifest is not ready yet");
+                            os_version_match = requirement.eq(value)
+                        }
+                    }
+                    RuleOS::Other { .. } => {
+                        continue;
+                    }
+                };
+            }
+            return os_arch_match && os_version_match && os_name_match;
+        }
+
+        true
+    }
+
+    pub fn should_do_feature(&self, features_enabled: Vec<String>) -> bool {
+
+        if let RuleRequirement::Features(features) = &self.requirement {
+            for (key, _) in features {
+                if !features_enabled.contains(key) {
+                    return false;
+                }
+            }
+        }
+        true
+    }
 }
 
 impl<'de> Deserialize<'de> for Rule {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
+        where
+            D: Deserializer<'de>,
     {
         struct RuleVisitor;
         #[derive(Deserialize)]
@@ -70,11 +117,11 @@ impl<'de> Deserialize<'de> for Rule {
             }
 
             fn visit_map<V>(self, mut map: V) -> Result<Rule, V::Error>
-            where
-                V: MapAccess<'de>,
+                where
+                    V: MapAccess<'de>,
             {
                 let mut action: Option<RuleType> = None;
-                let mut requirements: Vec<RuleRequirement> = Vec::new();
+                let mut requirement: Option<RuleRequirement> = None;
                 while let Some(key) = map.next_key()? {
                     match key {
                         Field::Action => {
@@ -96,19 +143,20 @@ impl<'de> Deserialize<'de> for Rule {
                                     _ => os.push(RuleOS::Other { key, value }),
                                 }
                             }
-                            let requirement = RuleRequirement::OS(os);
-                            requirements.push(requirement)
+                            let r = RuleRequirement::OS(os);
+                            requirement = Some(r)
                         }
                         Field::Features => {
-                            let requirement = RuleRequirement::Features(map.next_value()?);
-                            requirements.push(requirement)
+                            let r = RuleRequirement::Features(map.next_value()?);
+                            requirement = Some(r)
                         }
                     }
                 }
                 let action = action.ok_or_else(|| de::Error::missing_field("action"))?;
+                let requirement = requirement.ok_or_else(|| de::Error::missing_field("requirement"))?;
                 Ok(Rule {
                     action,
-                    requirements,
+                    requirement,
                 })
             }
         }
