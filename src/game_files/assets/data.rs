@@ -2,10 +2,10 @@ use serde::Deserialize;
 use std::collections::HashMap;
 use std::path::PathBuf;
 
+use crate::game_files::assets::{content_hash, file_path, Asset};
 use crate::utils::download::{Download, DownloadToFile};
 use crate::{APIClient, Error};
 use tokio::fs::create_dir_all;
-use crate::game_files::assets::{Asset, content_hash, file_path};
 
 /// The Asset File
 /// Asset File Example 1.19 ['{launcher_meta}/v1/packages/c76d769e6bf9c90a7ffff1481a05563777356749/1.19.json'](https://launchermeta.mojang.com/v1/packages/c76d769e6bf9c90a7ffff1481a05563777356749/1.19.json)
@@ -54,11 +54,11 @@ impl AssetFile {
             if downloads.contains_key(&response.hash) {
                 continue;
             }
-            let (sub, hash) = content_hash(response.hash);
+            let sub = content_hash(&response.hash);
 
             let asset_file = asset_dir.join(file_path(
                 name.as_str(),
-                (sub.as_str(), hash.as_str()),
+                (sub, &response.hash),
                 self.map_to_resources,
             ));
             if asset_file.exists() {
@@ -67,10 +67,10 @@ impl AssetFile {
             }
             let url = client
                 .game_files
-                .create_resource_url(format!("{}/{}", &sub, &hash));
+                .create_resource_url(format!("{}/{}", &sub, &response.hash));
 
             downloads.insert(
-                hash,
+                response.hash,
                 DownloadToFile::new(
                     Download {
                         url,

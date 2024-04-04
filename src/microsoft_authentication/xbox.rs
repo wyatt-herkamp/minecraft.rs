@@ -1,13 +1,15 @@
-use std::fmt::{Debug, Formatter};
+use crate::{APIClient, Error, ACCEPT};
 use chrono::{DateTime, Utc};
-use reqwest::{Body, StatusCode};
 use reqwest::header::CONTENT_TYPE;
-use serde::{Deserialize, Serialize};
+
 use serde::de::DeserializeOwned;
+use serde::{Deserialize, Serialize};
 use serde_json::json;
-use crate::{ACCEPT, APIClient, Error};
+use std::fmt::Debug;
+use thiserror::Error;
 /// This Type Wraps the XErr that XSTS can respond with
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Error, Debug)]
+#[error("XSTS Error: {error_code}")]
 pub struct XSTSError {
     #[serde(rename = "Identity")]
     pub identity: String,
@@ -25,18 +27,11 @@ impl From<String> for XSTSError {
     }
 }
 
-impl Debug for XSTSError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", serde_json::to_string(self).unwrap())
-    }
-}
-
 #[derive(Deserialize, Debug)]
 pub struct XboxDisplayClaims {
     #[serde(rename = "xui")]
     pub x_ui: Vec<XUI>,
 }
-
 
 #[derive(Deserialize, Debug)]
 pub struct XUI {
@@ -67,19 +62,20 @@ impl XboxLiveResponse {
         &self.display_claims.x_ui.get(0).unwrap().user_hash
     }
     pub fn get_user_hash(&self) -> Option<&String> {
-        self.display_claims.x_ui.get(0).and_then(|value| Some(&value.user_hash))
+        self.display_claims
+            .x_ui
+            .get(0)
+            .and_then(|value| Some(&value.user_hash))
     }
 }
 
-
-impl APIClient{
+impl APIClient {
     /// Creates a Xbox Live Token from the Microsoft Authentication Token
     pub async fn authenticate_xbl<S: AsRef<str>>(
         &self,
         authorization_token: S,
     ) -> Result<Result<XboxLiveResponse, XSTSError>, Error> {
-        let authorization_url =
-            format!("https://user.auth.xboxlive.com/user/authenticate");
+        let _authorization_url = format!("https://user.auth.xboxlive.com/user/authenticate");
         let rps = format!("d={}", authorization_token.as_ref());
         let value = json!({
                 "Properties": {
@@ -91,8 +87,11 @@ impl APIClient{
                "TokenType": "JWT"
         });
 
-
-        self.make_request("https://xsts.auth.xboxlive.com/xsts/authorize", serde_json::to_string(&value).unwrap()).await
+        self.make_request(
+            "https://xsts.auth.xboxlive.com/xsts/authorize",
+            serde_json::to_string(&value).unwrap(),
+        )
+        .await
     }
 
     /// Generates an Xbox Live security Token from the xbox_live token
@@ -101,7 +100,7 @@ impl APIClient{
         &self,
         xbox_live_token: S,
     ) -> Result<Result<XboxLiveResponse, XSTSError>, Error> {
-        let authorization_url = "https://xsts.auth.xboxlive.com/xsts/authorize";
+        let _authorization_url = "https://xsts.auth.xboxlive.com/xsts/authorize";
         let value = json!({
                 "Properties": {
                  "SandboxId": "RETAIL",
@@ -111,32 +110,34 @@ impl APIClient{
                "TokenType": "JWT"
         });
         let value = serde_json::to_string(&value).unwrap();
-        self.make_request("https://xsts.auth.xboxlive.com/xsts/authorize", value).await
+        self.make_request("https://xsts.auth.xboxlive.com/xsts/authorize", value)
+            .await
     }
 
     /// Internal Use to limit the amount of code I am repeating
-    async fn make_request<D: DeserializeOwned, E: From<String>>(&self, url: &str, content: String) -> Result<Result<D, E>, Error> {
-        match self.process_json::<D>(self
-            .http_client
-            .post(url)
-            .header(CONTENT_TYPE, "application/json")
-            .header(ACCEPT, "application/json")
-            .body(content))
-            .await {
-            Ok(ok) => {
-                Ok(Ok(ok))
-            }
-            Err(error) => {
-                match error {
-                    Error::BadResponse(response) => {
-                        let response = response.text().await?;
-                        Ok(Err(E::from(response)))
-                    }
-                    error => {
-                        Err(error)
-                    }
+    async fn make_request<D: DeserializeOwned, E: From<String>>(
+        &self,
+        url: &str,
+        content: String,
+    ) -> Result<Result<D, E>, Error> {
+        match self
+            .process_json::<D>(
+                self.http_client
+                    .post(url)
+                    .header(CONTENT_TYPE, "application/json")
+                    .header(ACCEPT, "application/json")
+                    .body(content),
+            )
+            .await
+        {
+            Ok(ok) => Ok(Ok(ok)),
+            Err(error) => match error {
+                Error::BadResponse(response) => {
+                    let response = response.text().await?;
+                    Ok(Err(E::from(response)))
                 }
-            }
+                error => Err(error),
+            },
         }
     }
 }

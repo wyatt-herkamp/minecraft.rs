@@ -1,30 +1,44 @@
+use std::ops::Deref;
+
+pub use crate::error::Error;
+use crate::http::IntoResult;
+use game_files::GameFilesAPIBuilder;
+pub use microsoft_authentication::*;
 use reqwest::header::ACCEPT;
 use reqwest::RequestBuilder;
 use serde::de::DeserializeOwned;
-pub use crate::error::Error;
-use crate::http::IntoResult;
-
+use serde::{Deserialize, Serialize};
 
 pub mod error;
-pub mod http;
-pub mod utils;
-pub mod mojang_time;
-#[cfg(feature = "profile_api")]
-pub mod profile;
-#[cfg(feature = "game_files")]
 pub mod game_files;
-#[cfg(feature = "mojang_api")]
-pub mod mojang_api;
-#[cfg(feature = "microsoft_authentication")]
+pub mod http;
 pub mod microsoft_authentication;
+pub mod mojang_api;
+pub(crate) mod mojang_time;
+pub mod profile;
+pub mod utils;
+#[derive(Clone, Debug, Deserialize, Serialize, Default)]
 
+pub struct APIClientSettings {
+    #[serde(default)]
+    pub game_files: GameFilesAPIBuilder,
+    pub auth_properties: Option<AuthProperties>,
+}
 pub struct APIClient {
     pub(crate) http_client: reqwest::Client,
-    #[cfg(feature = "game_files")]
-    pub game_files: game_files::GameFilesAPIBuilder,
-    #[cfg(feature = "microsoft_authentication")]
-    pub auth_properties: microsoft_authentication::AuthProperties,
+    pub(crate) game_files: GameFilesAPIBuilder,
+}
 
+pub struct APIClientWithAuth {
+    pub api_client: APIClient,
+    pub auth_properties: AuthProperties,
+}
+impl Deref for APIClientWithAuth {
+    type Target = APIClient;
+
+    fn deref(&self) -> &Self::Target {
+        &self.api_client
+    }
 }
 
 impl APIClient {

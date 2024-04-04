@@ -1,9 +1,9 @@
 use std::path::PathBuf;
 
+use crate::game_files::assets::{content_hash, file_path, Asset};
 use crate::utils::download::{Download, DownloadToFile};
 use crate::Error;
 use tokio::fs::create_dir_all;
-use crate::game_files::assets::{Asset, content_hash, file_path};
 
 /// A wrap around the Download type to allow you to specific just a asset directory. Instead of the entire type
 pub struct AssetDownload<'a, D> {
@@ -33,10 +33,10 @@ impl AssetDownload<'_, Download<'_>> {
         if !asset_dir.exists() {
             create_dir_all(&asset_dir).await?;
         }
-        let (sub, hash) = content_hash(self.asset.data.hash.clone());
+        let sub = content_hash(&self.asset.data.hash);
         let asset_file = asset_dir.join(file_path(
             self.asset.name.as_str(),
-            (sub.as_str(), hash.as_str()),
+            (sub, &self.asset.data.hash),
             map_to_resources,
         ));
         self.download
@@ -64,10 +64,10 @@ impl AssetDownload<'_, DownloadToFile<'_>> {
     where
         F: Fn(usize),
     {
-        let (sub, hash) = content_hash(self.asset.data.hash.clone());
+        let sub = content_hash(&self.asset.data.hash);
         let asset_file = self.download.location.join(file_path(
             self.asset.name.as_str(),
-            (sub.as_str(), hash.as_str()),
+            (sub, &self.asset.data.hash),
             map_to_resources,
         ));
         self.download

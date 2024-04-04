@@ -1,12 +1,17 @@
-use serde::Deserialize;
-use std::collections::HashMap;
 use crate::game_files::release::data::ReleaseData;
 use crate::game_files::release::rule::{Rule, RuleType};
+use serde::Deserialize;
+use std::collections::HashMap;
 
 impl ReleaseData {
-    pub fn get_libraries_to_download(&self, os: String, arch: String, version: Option<String>) -> Vec<&Library> {
+    pub fn get_libraries_to_download(
+        &self,
+        os: String,
+        arch: String,
+        version: Option<String>,
+    ) -> Vec<&Library> {
         let mut libraries = Vec::new();
-        for library in &self.libraries.iter() {
+        for library in self.libraries.iter() {
             if let Some(rules) = library.rules.as_ref() {
                 for rule in rules {
                     let mut should_download = false;
@@ -22,7 +27,7 @@ impl ReleaseData {
                             }
                         }
                     }
-                    if should_download{
+                    if should_download {
                         libraries.push(library)
                     }
                 }

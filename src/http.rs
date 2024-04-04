@@ -1,8 +1,8 @@
-use std::str::FromStr;
-use reqwest::header::{HeaderMap, HeaderName};
-use reqwest::Response;
 use crate::error;
 use crate::error::Error;
+use reqwest::header::{HeaderMap, HeaderName};
+use reqwest::Response;
+use std::str::FromStr;
 
 pub trait IntoResult {
     fn into_result(self) -> Result<Response, Error>;
@@ -19,9 +19,9 @@ impl IntoResult for Response {
 }
 
 pub fn get_header<T>(headers: &HeaderMap, header: HeaderName) -> Result<T, Error>
-    where
-        T: FromStr,
-        <T as FromStr>::Err: std::error::Error,
+where
+    T: FromStr,
+    <T as FromStr>::Err: std::error::Error,
 {
     headers
         .get(header.clone())

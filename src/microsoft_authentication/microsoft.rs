@@ -1,13 +1,14 @@
-use std::fmt::{Debug, Formatter};
-use std::marker::PhantomData;
-use std::str::FromStr;
-use reqwest::Body;
+use crate::utils::query_string_builder::QueryString;
+use crate::{APIClientWithAuth, AuthProperties, Error};
 use reqwest::header::CONTENT_TYPE;
+
+use reqwest::Body;
 use serde::de::DeserializeOwned;
-use crate::{APIClient, Error};
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
+use std::fmt::Debug;
+use url::Url;
 
-
+use thiserror::Error;
 
 /// The Response from a Authorization Request for Microsoft
 /// Documented [Here](https://docs.microsoft.com/en-us/azure/active-directory/develop/v2-oauth2-auth-code-flow#successful-response-2)
@@ -27,7 +28,8 @@ pub struct AuthorizationTokenResponse {
 
 /// An Error Response from Microsoft
 /// [Microsoft Error Response](https://docs.microsoft.com/en-us/azure/active-directory/develop/v2-oauth2-auth-code-flow#error-response-1)
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Error, Debug)]
+#[error("Microsoft Error Code Error: {error}")]
 pub struct MicrosoftError {
     pub error_codes: Vec<i64>,
     pub error: String,
@@ -43,12 +45,6 @@ impl From<String> for MicrosoftError {
     }
 }
 
-impl Debug for MicrosoftError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", serde_json::to_string(self).unwrap())
-    }
-}
-
 pub const MICROSOFT_LOGIN_URL: &str = "https://login.microsoftonline.com/consumer";
 pub const MICROSOFT_SCOPE: &str = "XboxLive.signin%20offline_access";
 
@@ -59,7 +55,7 @@ pub struct RefreshToken;
 
 impl RefreshToken {
     /// Creates a new Grant Code Authentication
-    pub fn new(api_client: &APIClient) -> MicrosoftAuthorization<'_, RefreshToken> {
+    pub fn new(api_client: &APIClientWithAuth) -> MicrosoftAuthorization<'_, RefreshToken> {
         MicrosoftAuthorization {
             client: api_client,
             internal: RefreshToken,
@@ -73,12 +69,14 @@ impl MicrosoftAuthorizationType for RefreshToken {}
 /// Requires the redirect url to be set
 pub struct GrantCode {
     pub redirect_url: String,
-
 }
 
 impl GrantCode {
     /// Creates a new Grant Code Authentication
-    pub fn new<S: Into<String>>(redirect_url: S, api_client: &APIClient) -> MicrosoftAuthorization<'_, GrantCode> {
+    pub fn new<S: Into<String>>(
+        redirect_url: S,
+        api_client: &APIClientWithAuth,
+    ) -> MicrosoftAuthorization<'_, GrantCode> {
         MicrosoftAuthorization {
             client: api_client,
             internal: GrantCode {
@@ -90,19 +88,16 @@ impl GrantCode {
 
 impl MicrosoftAuthorizationType for GrantCode {}
 
-
 /// Device Code follows the Microsoft Authentication Schema [Here](https://docs.microsoft.com/en-us/azure/active-directory/develop/v2-oauth2-device-code)
 /// This will not require a redirect URL for authentication
 pub struct DeviceCode;
 
 impl MicrosoftAuthorizationType for DeviceCode {}
 
-
 pub struct MicrosoftAuthorization<'a, T: MicrosoftAuthorizationType> {
-    pub client: &'a APIClient,
+    pub client: &'a APIClientWithAuth,
     pub internal: T,
 }
-
 
 impl<'a, T: MicrosoftAuthorizationType> MicrosoftAuthorization<'a, T> {
     /// Refreshes the Authorization Token via the Refresh Token
@@ -113,34 +108,44 @@ impl<'a, T: MicrosoftAuthorizationType> MicrosoftAuthorization<'a, T> {
         &self,
         refresh_token: S,
     ) -> Result<Result<AuthorizationTokenResponse, MicrosoftError>, Error> {
-        let authorization_url =
-            format!("{MICROSOFT_LOGIN_URL}/oauth2/v2.0/token");
+        let AuthProperties {
+            azura_microsoft_client,
+            ..
+        } = &self.client.auth_properties;
+        let authorization_url = format!("{MICROSOFT_LOGIN_URL}/oauth2/v2.0/token");
         let refresh_token = refresh_token.as_ref();
-        let content = format!("client_id={client_id}&scope={MICROSOFT_SCOPE}&refresh_token={refresh_token}&grant_type=refresh_token&", client_id = self.client.auth_properties.azura_microsoft_client);
-        self.make_request(authorization_url, content).await
+        let query_string = QueryString::default()
+            .add_str("client_id", azura_microsoft_client)
+            .add_str("scope", MICROSOFT_SCOPE)
+            .add_str("refresh_token", refresh_token)
+            .add_str("grant_type", "refresh_token");
+        self.make_request(authorization_url, query_string).await
     }
     /// Internal Use to limit the amount of code I am repeating
-    async fn make_request<D: DeserializeOwned, E: From<String>>(&self, url: String, content: String) -> Result<Result<D, E>, Error> {
-        match self.client.process_json::<D>(self.client
-            .http_client
-            .post(url)
-            .header(CONTENT_TYPE, "application/x-www-form-urlencoded")
-            .body(content))
-            .await {
-            Ok(ok) => {
-                Ok(Ok(ok))
-            }
-            Err(error) => {
-                match error {
-                    Error::BadResponse(response) => {
-                        let response = response.text().await?;
-                        Ok(Err(E::from(response)))
-                    }
-                    error => {
-                        Err(error)
-                    }
+    async fn make_request<D: DeserializeOwned, E: From<String>>(
+        &self,
+        url: String,
+        content: impl Into<Body>,
+    ) -> Result<Result<D, E>, Error> {
+        match self
+            .client
+            .process_json::<D>(
+                self.client
+                    .http_client
+                    .post(url)
+                    .header(CONTENT_TYPE, "application/x-www-form-urlencoded")
+                    .body(content),
+            )
+            .await
+        {
+            Ok(ok) => Ok(Ok(ok)),
+            Err(error) => match error {
+                Error::BadResponse(response) => {
+                    let response = response.text().await?;
+                    Ok(Err(E::from(response)))
                 }
-            }
+                error => Err(error),
+            },
         }
     }
 }
@@ -151,8 +156,19 @@ impl<'a> MicrosoftAuthorization<'a, GrantCode> {
     ///
     /// [Successful Response](https://docs.microsoft.com/en-us/azure/active-directory/develop/v2-oauth2-auth-code-flow#successful-response)
     /// [Error Response](https://docs.microsoft.com/en-us/azure/active-directory/develop/v2-oauth2-auth-code-flow#error-codes-for-authorization-endpoint-errors)
-    pub fn generate_login_url(&self) -> String {
-        format!("{MICROSOFT_LOGIN_URL}/oauth2/v2.0/authorize?client_id={client_id}&response_type=code&redirect_uri={redirect_url}&scope={MICROSOFT_SCOPE}", client_id = self.client.auth_properties.azura_microsoft_client, redirect_url = self.internal.redirect_url)
+    pub fn generate_login_url(&self) -> Result<Url, Error> {
+        let AuthProperties {
+            azura_microsoft_client,
+            ..
+        } = &self.client.auth_properties;
+        let query_string = QueryString::new_with_capacity(4)
+            .add_str("client_id", azura_microsoft_client)
+            .add_str("response_type", "code")
+            .add_str("redirect_uri", &self.internal.redirect_url)
+            .add_str("scope", MICROSOFT_SCOPE);
+        query_string
+            .build_with_url(&format!("{MICROSOFT_LOGIN_URL}/oauth2/v2.0/authorize"))
+            .map_err(Error::URLParse)
     }
     /// Generates a Authorization Token from the access code
     /// The access code should not be saved. This should immediately be given to this function
@@ -163,12 +179,17 @@ impl<'a> MicrosoftAuthorization<'a, GrantCode> {
         &self,
         access_code: String,
     ) -> Result<Result<AuthorizationTokenResponse, MicrosoftError>, Error> {
-        let authorization_url =
-            format!("{MICROSOFT_LOGIN_URL}/oauth2/v2.0/token");
-        let content = format!("client_id={client_id}&code={access_code}&scope={MICROSOFT_SCOPE}&grant_type=authorization_code&redirect_uri={redirect_url}",
-                              client_id = self.client.auth_properties.azura_microsoft_client, redirect_url = self.internal.redirect_url);
-        self.make_request(authorization_url, content).await
+        let AuthProperties {
+            azura_microsoft_client,
+            ..
+        } = &self.client.auth_properties;
+        let authorization_url = format!("{MICROSOFT_LOGIN_URL}/oauth2/v2.0/token");
+        let query_string = QueryString::new_with_capacity(5)
+            .add_str("client_id", azura_microsoft_client)
+            .add_str("code", &access_code)
+            .add_str("scope", MICROSOFT_SCOPE)
+            .add_str("grant_type", "authorization_code")
+            .add_str("redirect_uri", &self.internal.redirect_url);
+        self.make_request(authorization_url, query_string).await
     }
 }
-
-

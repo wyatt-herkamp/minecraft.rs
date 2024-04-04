@@ -1,12 +1,11 @@
+use crate::game_files::release::rule::Rule;
 use serde::de::{MapAccess, Visitor};
 use serde::{de, Deserialize, Deserializer};
 use serde_json::Value;
 use std::convert::Infallible;
 use std::error::Error;
 use std::fmt;
-use std::fmt::Write;
 use std::str::FromStr;
-use crate::game_files::release::rule::Rule;
 
 /// The Arguments for the game
 #[derive(Deserialize, Debug)]

@@ -1,12 +1,12 @@
-use crate::Error;
-use crate::{APIClient};
-use chrono::{DateTime, Utc};
-use reqwest::Url;
-use serde::Deserialize;
 use crate::game_files::release::data::ReleaseData;
 use crate::game_files::release::Release;
 use crate::game_files::version_type::VersionType;
 use crate::mojang_time;
+use crate::APIClient;
+use crate::Error;
+use chrono::{DateTime, Utc};
+use reqwest::Url;
+use serde::Deserialize;
 
 /// The main manliest file found at ['{launcher_meta}/mc/game/version_manifest_v2.json'](https://launchermeta.mojang.com/mc/game/version_manifest_v2.json)
 #[derive(Deserialize, Debug)]
@@ -48,7 +48,9 @@ impl Version {
     /// Uses the url found inside the Version to pull the Release Data.
     pub async fn get_release<'a>(&self, client: &'a APIClient) -> Result<Release<'a>, Error> {
         let url = Url::parse(&self.url).unwrap();
-        let release = client.process_json::<ReleaseData>(client.http_client.get(url)).await?;
+        let release = client
+            .process_json::<ReleaseData>(client.http_client.get(url))
+            .await?;
         Ok(Release {
             client,
             data: release,

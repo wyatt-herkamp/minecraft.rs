@@ -1,10 +1,8 @@
+use log::warn;
 use serde::de::{MapAccess, Visitor};
 use serde::{de, Deserialize, Deserializer};
-use serde_json::Value;
+
 use std::collections::HashMap;
-use std::fmt;
-use std::fmt::Write;
-use log::warn;
 
 /// The Rule Type
 #[derive(Deserialize, Debug)]
@@ -49,7 +47,13 @@ pub struct Rule {
 }
 
 impl Rule {
-    pub fn should_do(&self, os: &str, arch: &str, version: Option<String>, features_enabled: Vec<String>) -> bool {
+    pub fn should_do(
+        &self,
+        os: &str,
+        arch: &str,
+        version: Option<String>,
+        features_enabled: Vec<String>,
+    ) -> bool {
         self.should_do_os(os, arch, version) && self.should_do_feature(features_enabled)
     }
     pub fn should_do_os(&self, os: &str, arch: &str, version: Option<String>) -> bool {
@@ -59,12 +63,8 @@ impl Rule {
             let mut os_version_match = true;
             for os_rule in os_rules.iter() {
                 match &os_rule {
-                    RuleOS::Name(name) => {
-                        os_name_match = name.eq(os)
-                    }
-                    RuleOS::Arch(value) => {
-                        os_arch_match = arch.eq(value)
-                    }
+                    RuleOS::Name(name) => os_name_match = name.eq(os),
+                    RuleOS::Arch(value) => os_arch_match = arch.eq(value),
                     RuleOS::Version(value) => {
                         if let Some(requirement) = version.as_ref() {
                             warn!("Version parsing from the manifest is not ready yet");
@@ -83,7 +83,6 @@ impl Rule {
     }
 
     pub fn should_do_feature(&self, features_enabled: Vec<String>) -> bool {
-
         if let RuleRequirement::Features(features) = &self.requirement {
             for (key, _) in features {
                 if !features_enabled.contains(key) {
@@ -97,8 +96,8 @@ impl Rule {
 
 impl<'de> Deserialize<'de> for Rule {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where
-            D: Deserializer<'de>,
+    where
+        D: Deserializer<'de>,
     {
         struct RuleVisitor;
         #[derive(Deserialize)]
@@ -112,13 +111,13 @@ impl<'de> Deserialize<'de> for Rule {
         impl<'de> Visitor<'de> for RuleVisitor {
             type Value = Rule;
 
-            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
                 formatter.write_str("Expecting Rule Type")
             }
 
             fn visit_map<V>(self, mut map: V) -> Result<Rule, V::Error>
-                where
-                    V: MapAccess<'de>,
+            where
+                V: MapAccess<'de>,
             {
                 let mut action: Option<RuleType> = None;
                 let mut requirement: Option<RuleRequirement> = None;
@@ -153,7 +152,8 @@ impl<'de> Deserialize<'de> for Rule {
                     }
                 }
                 let action = action.ok_or_else(|| de::Error::missing_field("action"))?;
-                let requirement = requirement.ok_or_else(|| de::Error::missing_field("requirement"))?;
+                let requirement =
+                    requirement.ok_or_else(|| de::Error::missing_field("requirement"))?;
                 Ok(Rule {
                     action,
                     requirement,

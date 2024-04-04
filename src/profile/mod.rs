@@ -1,11 +1,9 @@
-use reqwest::header::{AUTHORIZATION, HeaderName, HeaderValue};
+use crate::{APIClient, Error};
+use reqwest::header::AUTHORIZATION;
 use reqwest::{IntoUrl, RequestBuilder};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize};
 use serde_json::Value;
 use uuid::Uuid;
-use crate::{APIClient, Error};
-
-
 
 impl APIClient {
     pub fn profile(&self, token: &str) -> Profile<'_> {
@@ -21,13 +19,12 @@ pub struct Profile<'a> {
     api: &'a APIClient,
 }
 
-
 impl<'a> Profile<'a> {
     pub(crate) fn get<U: IntoUrl>(&self, url: U) -> RequestBuilder {
-        self.api.http_client.get(url).header(AUTHORIZATION, &self.authorization)
-    }
-    pub(crate) fn post_json<S: Serialize + ?Sized, U: IntoUrl>(&self, url: U, s: &S) -> RequestBuilder {
-        self.api.http_client.get(url).header(AUTHORIZATION, &self.authorization).json(s)
+        self.api
+            .http_client
+            .get(url)
+            .header(AUTHORIZATION, &self.authorization)
     }
 }
 
@@ -53,6 +50,8 @@ pub struct ProfileResponse {
 impl<'a> Profile<'a> {
     /// Returns the User Profile for the authenticated User
     pub async fn get_profile(&self) -> Result<ProfileResponse, Error> {
-        self.api.process_json(self.get("https://api.minecraftservices.com/minecraft/profile")).await
+        self.api
+            .process_json(self.get("https://api.minecraftservices.com/minecraft/profile"))
+            .await
     }
 }

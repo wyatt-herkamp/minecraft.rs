@@ -1,11 +1,14 @@
-use std::ops::Add;
+use crate::microsoft_authentication::microsoft::{
+    AuthorizationTokenResponse, MicrosoftError, RefreshToken,
+};
+use crate::microsoft_authentication::minecraft::MinecraftLoginResponse;
+use crate::microsoft_authentication::xbox::{XSTSError, XboxLiveResponse};
+use crate::{APIClientWithAuth, Error};
 use chrono::{DateTime, Duration, Utc};
 use log::debug;
-use serde::{Serialize, Deserialize};
-use crate::{APIClient, Error};
-use crate::microsoft_authentication::microsoft::{AuthorizationTokenResponse, MicrosoftError, RefreshToken};
-use crate::microsoft_authentication::minecraft::MinecraftLoginResponse;
-use crate::microsoft_authentication::xbox::{XboxLiveResponse, XSTSError};
+use serde::{Deserialize, Serialize};
+use std::ops::Add;
+use thiserror::Error;
 
 /// This structure gives an easy way to get the Minecraft token without you having to call all the functions again
 /// it only stores the Refresh Token from Microsoft(Unknown Life Span), Xbox Token(14 days), Minecraft Token(24 hours)
@@ -18,12 +21,16 @@ pub struct AccountSave {
 }
 
 /// The Types an Account Load can create
+#[derive(Debug, Error)]
 pub enum AccountLoadError {
     /// Internal Error.
+    #[error(transparent)]
     InternalError(Error),
     /// Xbox Live Error
+    #[error(transparent)]
     XboxLiveError(XSTSError),
     /// Microsoft Error
+    #[error(transparent)]
     MicrosoftError(MicrosoftError),
 }
 
@@ -45,17 +52,22 @@ impl From<MicrosoftError> for AccountLoadError {
     }
 }
 
-impl APIClient {
+impl APIClientWithAuth {
     /// Creates a based on the AAuthorization Response from Microsoft
     /// # Errors
     /// Read the docs on [AccountLoadError](AccountLoadError)
-    pub async fn create_account(&self, auth: AuthorizationTokenResponse) -> Result<AccountSave, AccountLoadError> {
+    pub async fn create_account(
+        &self,
+        auth: AuthorizationTokenResponse,
+    ) -> Result<AccountSave, AccountLoadError> {
         debug!("Acquiring a Xbox Live Token");
         let xbox_save = self.authenticate_xbl(&auth.access_token).await??;
         debug!("Acquiring the XSTS token");
         let xsts = self.authenticate_xsts(&xbox_save.token).await??;
         debug!("Acquiring the Minecraft Token");
-        let minecraft = self.authenticate_minecraft( xsts.get_user_hash_unsafe(), &xsts.token).await?;
+        let minecraft = self
+            .authenticate_minecraft(xsts.get_user_hash_unsafe(), &xsts.token)
+            .await?;
         Ok(AccountSave {
             microsoft_token: auth.into(),
             xbox: xbox_save.into(),
@@ -70,10 +82,12 @@ impl APIClient {
         let current_time = Utc::now();
         if account.minecraft_save.expires <= current_time {
             debug!("Minecraft Token Expired");
-          if account.xbox.expires <= current_time {
+            if account.xbox.expires <= current_time {
                 debug!("Xbox Token Expired.");
                 debug!("Acquiring a access_token from Microsoft");
-                let response = RefreshToken::new(&self).refresh_token(&account.microsoft_token.refresh_token).await??;
+                let response = RefreshToken::new(&self)
+                    .refresh_token(&account.microsoft_token.refresh_token)
+                    .await??;
                 account.microsoft_token.refresh_token = response.refresh_token;
                 debug!("Acquiring a new Xbox Live Token");
                 let ok = self.authenticate_xbl(&response.access_token).await??;
@@ -82,7 +96,9 @@ impl APIClient {
             debug!("Acquiring the XSTS token");
             let xsts = self.authenticate_xsts(&account.xbox.token).await??;
             debug!("Acquiring the Minecraft Token");
-            let minecraft = self.authenticate_minecraft(xsts.get_user_hash_unsafe(), &xsts.token).await?;
+            let minecraft = self
+                .authenticate_minecraft(xsts.get_user_hash_unsafe(), &xsts.token)
+                .await?;
             account.minecraft_save = minecraft.into();
             return Ok(true);
         }
@@ -96,11 +112,10 @@ pub struct MicrosoftToken {
     pub refresh_token: String,
 }
 
-
 impl From<AuthorizationTokenResponse> for MicrosoftToken {
     fn from(value: AuthorizationTokenResponse) -> Self {
         MicrosoftToken {
-            refresh_token: value.refresh_token
+            refresh_token: value.refresh_token,
         }
     }
 }

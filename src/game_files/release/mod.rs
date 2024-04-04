@@ -1,8 +1,7 @@
-
-use crate::{APIClient, Error};
-use reqwest::Url;
 use crate::game_files::assets::data::AssetFile;
 use crate::game_files::release::data::ReleaseData;
+use crate::{APIClient, Error};
+use reqwest::Url;
 
 pub mod argument;
 pub mod data;
@@ -19,7 +18,9 @@ impl Release<'_> {
     /// Gets the Asset File from the Release
     pub async fn get_asset_file(&self) -> Result<AssetFile, Error> {
         let url = Url::parse(&self.data.asset_index.url).unwrap();
-        self.client.process_json::<AssetFile>(self.client.http_client.get(url)).await
+        self.client
+            .process_json::<AssetFile>(self.client.http_client.get(url))
+            .await
     }
 }
 

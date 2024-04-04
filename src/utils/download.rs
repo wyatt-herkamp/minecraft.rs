@@ -32,7 +32,8 @@ impl Download<'_> {
     where
         F: Fn(usize),
     {
-        super::download_with_subscriber(self.url, &self.client.http_client, location, subscriber).await
+        super::download_with_subscriber(self.url, &self.client.http_client, location, subscriber)
+            .await
     }
     /// Returns the bytes for the download
     pub async fn get_bytes(self) -> Result<Vec<u8>, Error> {

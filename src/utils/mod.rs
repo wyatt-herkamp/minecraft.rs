@@ -1,15 +1,13 @@
-use crate::{Error};
-use reqwest::header::{HeaderMap, HeaderName};
-use reqwest::{Client, StatusCode, Url};
+use crate::Error;
+
+use reqwest::{Client, Url};
 use std::path::PathBuf;
-use std::str::FromStr;
-use tokio::fs::{create_dir_all, remove_dir, OpenOptions};
+
+use tokio::fs::{create_dir_all, OpenOptions};
 use tokio::io::AsyncWriteExt;
 
 pub mod download;
-
-
-
+pub(crate) mod query_string_builder;
 pub async fn download_with_subscriber<F>(
     url: Url,
     reqwest: &Client,
