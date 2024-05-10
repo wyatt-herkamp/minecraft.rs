@@ -9,7 +9,7 @@ use tokio::fs::create_dir_all;
 
 /// The Asset File
 /// Asset File Example 1.19 ['{launcher_meta}/v1/packages/c76d769e6bf9c90a7ffff1481a05563777356749/1.19.json'](https://launchermeta.mojang.com/v1/packages/c76d769e6bf9c90a7ffff1481a05563777356749/1.19.json)
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 pub struct AssetFile {
     /// Will be found true on legacy versions.
     #[serde(default)]
@@ -18,7 +18,7 @@ pub struct AssetFile {
 }
 
 /// Object found in the Map of the [AssetFile](AssetFile)
-#[derive(Deserialize, Clone)]
+#[derive(Deserialize, Clone, Debug)]
 pub struct AssetResponse {
     pub hash: String,
     pub size: u32,

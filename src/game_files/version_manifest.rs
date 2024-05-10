@@ -14,7 +14,11 @@ pub struct VersionManifest {
     pub latest: Latest,
     pub versions: Vec<Version>,
 }
-
+impl VersionManifest {
+    pub fn get_version(&self, id: &str) -> Option<&Version> {
+        self.versions.iter().find(|version| version.id.eq(id))
+    }
+}
 /// The latest version information provided by the api
 #[derive(Deserialize, Debug)]
 pub struct Latest {

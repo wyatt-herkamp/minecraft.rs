@@ -1,6 +1,6 @@
-use log::warn;
 use serde::de::{MapAccess, Visitor};
 use serde::{de, Deserialize, Deserializer};
+use tracing::warn;
 
 use std::collections::HashMap;
 

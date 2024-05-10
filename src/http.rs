@@ -1,20 +1,24 @@
 use crate::error;
 use crate::error::Error;
 use reqwest::header::{HeaderMap, HeaderName};
-use reqwest::Response;
+use reqwest::{Response, StatusCode};
 use std::str::FromStr;
 
 pub trait IntoResult {
-    fn into_result(self) -> Result<Response, Error>;
+    async fn into_result<E: ResponseError>(self) -> Result<Response, E>;
 }
+pub trait ResponseError {
+    fn status_code(&self) -> StatusCode;
 
+    async fn from_err(response: Response) -> Self;
+}
 impl IntoResult for Response {
-    fn into_result(self) -> Result<Response, Error> {
+    async fn into_result<E: ResponseError>(self) -> Result<Response, E> {
         if self.status().is_success() {
-            Ok(self)
-        } else {
-            Err(Error::BadResponse(self))
+            return Ok(self);
         }
+        let error = E::from_err(self).await;
+        Err(error)
     }
 }
 

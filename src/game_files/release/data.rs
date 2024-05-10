@@ -5,7 +5,7 @@ use crate::game_files::release::library::Library;
 use crate::game_files::version_type::VersionType;
 use crate::mojang_time;
 use chrono::{DateTime, Utc};
-use serde::{Deserialize};
+use serde::Deserialize;
 use serde_json::Value;
 
 #[derive(Deserialize, Debug)]

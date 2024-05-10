@@ -7,7 +7,6 @@ use tokio::fs::{create_dir_all, OpenOptions};
 use tokio::io::AsyncWriteExt;
 
 pub mod download;
-pub(crate) mod query_string_builder;
 pub async fn download_with_subscriber<F>(
     url: Url,
     reqwest: &Client,

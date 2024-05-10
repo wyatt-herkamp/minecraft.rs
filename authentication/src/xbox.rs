@@ -1,16 +1,26 @@
-use crate::{APIClient, Error, ACCEPT};
+use crate::error::{BadResponseOrError, IntoResult, ResponseError};
+use crate::utils::BetterResponseToJson;
+use crate::{AuthenticationClient, InternalError, ACCEPT};
 use chrono::{DateTime, Utc};
 use reqwest::header::CONTENT_TYPE;
 
+use reqwest::{Body, IntoUrl, Response, StatusCode};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::fmt::Debug;
 use thiserror::Error;
-/// This Type Wraps the XErr that XSTS can respond with
-#[derive(Serialize, Deserialize, Error, Debug)]
-#[error("XSTS Error: {error_code}")]
+use tracing::{debug, error};
+#[derive(Debug, Clone, Error)]
+#[error("{response}")]
 pub struct XSTSError {
+    pub status_code: StatusCode,
+    pub response: XSTSErrorResponse,
+}
+/// This Type Wraps the XErr that XSTS can respond with
+#[derive(Serialize, Deserialize, Error, Debug, Clone)]
+#[error("XSTS Error: {error_code}")]
+pub struct XSTSErrorResponse {
     #[serde(rename = "Identity")]
     pub identity: String,
     #[serde(rename = "Message")]
@@ -20,10 +30,27 @@ pub struct XSTSError {
     #[serde(rename = "XErr")]
     pub error_code: String,
 }
+impl ResponseError for XSTSError {
+    fn status_code(&self) -> reqwest::StatusCode {
+        self.status_code
+    }
 
-impl From<String> for XSTSError {
-    fn from(value: String) -> Self {
-        serde_json::from_str(&value).unwrap()
+    async fn from_err(response: Response) -> Result<Self, InternalError> {
+        let status_code = response.status();
+        let response = response.better_to_json::<XSTSErrorResponse>().await;
+        match response {
+            Ok(ok) => Ok(XSTSError {
+                response: ok,
+                status_code,
+            }),
+            Err(err) => {
+                error!(
+                    ?err,
+                    "Could not parse the bad response from Microsoft. So 10/10 Job Microsoft"
+                );
+                Err(err.into())
+            }
+        }
     }
 }
 
@@ -69,13 +96,12 @@ impl XboxLiveResponse {
     }
 }
 
-impl APIClient {
+impl AuthenticationClient {
     /// Creates a Xbox Live Token from the Microsoft Authentication Token
     pub async fn authenticate_xbl<S: AsRef<str>>(
         &self,
         authorization_token: S,
-    ) -> Result<Result<XboxLiveResponse, XSTSError>, Error> {
-        let _authorization_url = format!("https://user.auth.xboxlive.com/user/authenticate");
+    ) -> Result<XboxLiveResponse, BadResponseOrError<XSTSError>> {
         let rps = format!("d={}", authorization_token.as_ref());
         let value = json!({
                 "Properties": {
@@ -88,7 +114,7 @@ impl APIClient {
         });
 
         self.make_request(
-            "https://xsts.auth.xboxlive.com/xsts/authorize",
+            "https://user.auth.xboxlive.com/user/authenticate",
             serde_json::to_string(&value).unwrap(),
         )
         .await
@@ -99,8 +125,7 @@ impl APIClient {
     pub async fn authenticate_xsts<S: AsRef<str>>(
         &self,
         xbox_live_token: S,
-    ) -> Result<Result<XboxLiveResponse, XSTSError>, Error> {
-        let _authorization_url = "https://xsts.auth.xboxlive.com/xsts/authorize";
+    ) -> Result<XboxLiveResponse, BadResponseOrError<XSTSError>> {
         let value = json!({
                 "Properties": {
                  "SandboxId": "RETAIL",
@@ -115,29 +140,33 @@ impl APIClient {
     }
 
     /// Internal Use to limit the amount of code I am repeating
-    async fn make_request<D: DeserializeOwned, E: From<String>>(
+
+    async fn make_request<D: DeserializeOwned>(
         &self,
-        url: &str,
-        content: String,
-    ) -> Result<Result<D, E>, Error> {
-        match self
-            .process_json::<D>(
-                self.http_client
-                    .post(url)
-                    .header(CONTENT_TYPE, "application/json")
-                    .header(ACCEPT, "application/json")
-                    .body(content),
-            )
+        url: impl IntoUrl,
+        content: impl Into<Body>,
+    ) -> Result<D, BadResponseOrError<XSTSError>> {
+        // Append Accept and CONTENT_TYPE Headers
+        let request = self
+            .http_client
+            .post(url)
+            .header(CONTENT_TYPE, "application/json")
+            .header(ACCEPT, "application/json")
+            .body(content)
+            .build()
+            .map_err(InternalError::from)?;
+        debug!(?request, "Making Request to Microsoft Authentication");
+        // Create Request
+        let response = self
+            .http_client
+            .execute(request)
             .await
-        {
-            Ok(ok) => Ok(Ok(ok)),
-            Err(error) => match error {
-                Error::BadResponse(response) => {
-                    let response = response.text().await?;
-                    Ok(Err(E::from(response)))
-                }
-                error => Err(error),
-            },
-        }
+            .map_err(InternalError::from)?
+            .into_result::<XSTSError>()
+            .await??;
+        let response = response.text().await.map_err(InternalError::from)?;
+        debug!(?response);
+        let parsed: D = serde_json::from_str(&response).map_err(InternalError::from)?;
+        Ok(parsed)
     }
 }

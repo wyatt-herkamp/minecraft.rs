@@ -1,5 +1,7 @@
-use reqwest::Response;
+use reqwest::{Response, StatusCode};
 use thiserror::Error;
+
+use crate::http::ResponseError;
 
 #[derive(Error, Debug)]
 pub enum Error {
@@ -18,7 +20,18 @@ pub enum Error {
     #[error("Invalid URL: {0}")]
     URLParse(#[from] url::ParseError),
 }
+impl ResponseError for Error {
+    fn status_code(&self) -> reqwest::StatusCode {
+        if let Error::BadResponse(response) = &self {
+            return response.status();
+        }
+        StatusCode::default()
+    }
 
+    async fn from_err(response: Response) -> Self {
+        Error::BadResponse(response)
+    }
+}
 impl From<reqwest::Error> for Error {
     fn from(err: reqwest::Error) -> Error {
         Error::ReqwestError(err)

@@ -1,22 +1,66 @@
-[package]
-name = "minecraft-rs"
+[workspace]
+members = ["authentication"]
+resolver = "2"
+[workspace.package]
 version = "0.0.1"
 authors = ["Wyatt Jacob Herkamp <wherkamp@gmail.com>"]
 repository = "https://github.com/wyatt-herkamp/minecraft.rs"
 edition = "2021"
 license = "MIT OR Apache-2.0"
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-[dependencies]
+[workspace.dependencies]
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 reqwest = { version = "0.12", features = ["multipart", "json"] }
-log = "0.4"
+tracing = "0.1"
 thiserror = "1.0"
 chrono = { version = "0.4", features = ["serde"] }
 sha-1 = "0.10"
-tokio = { version = "1", features = ["fs"] }
+tokio = { version = "1", features = ["full"] }
 uuid = { version = "1", features = ["serde"] }
-url = "2"
+url = { version = "2", features = ["serde"] }
+tracing-appender = "0.2"
+derive_more = { version = "1.0.0-beta", features = [
+    "display",
+    "from",
+    "deref",
+    "deref_mut",
+] }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+[workspace.lints.rust]
+missing_debug_implementations = "warn"
+async_fn_in_trait = "allow"
+
+[package]
+name = "minecraft-rs"
+version.workspace = true
+authors.workspace = true
+repository.workspace = true
+edition.workspace = true
+license.workspace = true
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+reqwest = { version = "0.12", features = ["multipart", "json"] }
+tracing.workspace = true
+thiserror.workspace = true
+chrono.workspace = true
+sha-1 = "0.10"
+tokio.workspace = true
+uuid.workspace = true
+url.workspace = true
+base64 = "0.22"
+derive_more.workspace = true
+minecraft-authentication = { path = "authentication" }
 [features]
 serialize_all = []
+
+[dev-dependencies]
+tracing-subscriber.workspace = true
+
+tokio = { version = "1", features = ["full"] }
+anyhow = "1.0"
+dotenv = "0.15.0"
+[lints]
+workspace = true

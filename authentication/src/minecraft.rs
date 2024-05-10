@@ -1,9 +1,10 @@
 use std::fmt::Display;
 
-use crate::{APIClient, Error};
+use crate::{AuthenticationClient, InternalError};
 use reqwest::header::CONTENT_TYPE;
 use reqwest::Body;
 use serde::{ser::SerializeStruct, Deserialize, Serialize};
+use tracing::debug;
 static LOGIN_WITH_XBOX: &str = "https://api.minecraftservices.com/authentication/login_with_xbox";
 #[derive(Deserialize, Debug)]
 pub struct MinecraftLoginResponse {
@@ -14,7 +15,7 @@ pub struct MinecraftLoginResponse {
     pub roles: Vec<String>,
 }
 
-impl APIClient {
+impl AuthenticationClient {
     /// Authenticate with Minecraft!
     /// After way to many queries to Microsoft you can finally get the Minecraft Bearer Token
 
@@ -22,12 +23,14 @@ impl APIClient {
         &self,
         user_hash: impl AsRef<str>,
         xsts_token: impl AsRef<str>,
-    ) -> Result<MinecraftLoginResponse, Error> {
+    ) -> Result<MinecraftLoginResponse, InternalError> {
         let identity_token = IdentityToken {
             user_hash: user_hash.as_ref(),
             xsts_token: xsts_token.as_ref(),
         };
         let body = serde_json::to_string(&identity_token)?;
+        debug!(?identity_token, ?body, "Getting Minecraft Token");
+
         self.process_json::<MinecraftLoginResponse>(
             self.http_client
                 .post(LOGIN_WITH_XBOX)
@@ -37,6 +40,7 @@ impl APIClient {
         .await
     }
 }
+#[derive(Debug)]
 struct IdentityToken<'a> {
     user_hash: &'a str,
     xsts_token: &'a str,

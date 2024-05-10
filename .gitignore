@@ -2,3 +2,5 @@
 /Cargo.lock
 .idea
 *.iml
+*.test.env
+*.test.json

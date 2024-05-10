@@ -1,35 +1,12 @@
-use crate::{APIClient, Error};
-use reqwest::header::AUTHORIZATION;
-use reqwest::{IntoUrl, RequestBuilder};
-use serde::{Deserialize};
+mod public;
+pub use public::*;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use uuid::Uuid;
 
-impl APIClient {
-    pub fn profile(&self, token: &str) -> Profile<'_> {
-        Profile {
-            authorization: format!("Bearer {}", token),
-            api: self,
-        }
-    }
-}
+use crate::{APIClient, Error};
 
-pub struct Profile<'a> {
-    authorization: String,
-    api: &'a APIClient,
-}
-
-impl<'a> Profile<'a> {
-    pub(crate) fn get<U: IntoUrl>(&self, url: U) -> RequestBuilder {
-        self.api
-            .http_client
-            .get(url)
-            .header(AUTHORIZATION, &self.authorization)
-    }
-}
-
-#[cfg_attr(feature = "serialize", derive(serde::Serialize))]
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Serialize, Clone, PartialEq)]
 pub struct ProfileSkin {
     pub id: String,
     pub state: String,
@@ -37,8 +14,7 @@ pub struct ProfileSkin {
     pub variant: String,
 }
 
-#[cfg_attr(feature = "serialize", derive(serde::Serialize))]
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Serialize, Clone, PartialEq)]
 pub struct ProfileResponse {
     pub id: Uuid,
     pub name: String,
@@ -46,12 +22,53 @@ pub struct ProfileResponse {
     // TODO parse this data
     pub capes: Vec<Value>,
 }
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct UUIDToName {
+    id: Uuid,
+    name: String,
+}
 
-impl<'a> Profile<'a> {
-    /// Returns the User Profile for the authenticated User
-    pub async fn get_profile(&self) -> Result<ProfileResponse, Error> {
-        self.api
-            .process_json(self.get("https://api.minecraftservices.com/minecraft/profile"))
-            .await
+impl APIClient {
+    pub async fn get_uuid_by_username(&self, name: &str) -> Result<UUIDToName, Error> {
+        let url = format!("https://api.mojang.com/users/profiles/minecraft/{name}");
+        self.process_json(self.http_client.get(url)).await
+    }
+    pub async fn get_profile_by_id(&self, id: Uuid) -> Result<GameProfile, Error> {
+        let url = format!(
+            "https://sessionserver.mojang.com/session/minecraft/profile/{}",
+            id.to_string()
+        );
+        self.process_json(self.http_client.get(url)).await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::str::FromStr;
+
+    use tracing::info;
+    use uuid::Uuid;
+
+    #[tokio::test]
+    async fn get_uuid_test() -> anyhow::Result<()> {
+        let client = crate::test::setup();
+
+        let response = client.get_uuid_by_username("KingTux").await?;
+        assert_eq!(
+            response.id,
+            Uuid::from_str("d087006bd72c4cdf924d6f903704d05c").unwrap()
+        );
+        info!(?response);
+        Ok(())
+    }
+    #[tokio::test]
+    async fn get_profile_test() -> anyhow::Result<()> {
+        let client = crate::test::setup();
+
+        let response = client
+            .get_profile_by_id(Uuid::from_str("d087006bd72c4cdf924d6f903704d05c").unwrap())
+            .await?;
+        info!(?response);
+        Ok(())
     }
 }

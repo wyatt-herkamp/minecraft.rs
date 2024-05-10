@@ -1,19 +1,18 @@
-use crate::microsoft_authentication::microsoft::{
-    AuthorizationTokenResponse, MicrosoftError, RefreshToken,
-};
-use crate::microsoft_authentication::minecraft::MinecraftLoginResponse;
-use crate::microsoft_authentication::xbox::{XSTSError, XboxLiveResponse};
-use crate::{APIClientWithAuth, Error};
+use crate::error::{BadResponseOrError, ResponseError};
+use crate::microsoft::{AuthorizationTokenResponse, MicrosoftError, RefreshToken};
+use crate::minecraft::MinecraftLoginResponse;
+use crate::xbox::{XSTSError, XboxLiveResponse};
+use crate::{AuthenticationClient, InternalError};
 use chrono::{DateTime, Duration, Utc};
-use log::debug;
 use serde::{Deserialize, Serialize};
 use std::ops::Add;
 use thiserror::Error;
+use tracing::{debug, error};
 
 /// This structure gives an easy way to get the Minecraft token without you having to call all the functions again
 /// it only stores the Refresh Token from Microsoft(Unknown Life Span), Xbox Token(14 days), Minecraft Token(24 hours)
 /// We will not store the XSTS token because the life span is 24 hours. The same as the Minecraft Token
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct AccountSave {
     pub microsoft_token: MicrosoftToken,
     pub xbox: XboxUserSave,
@@ -25,34 +24,31 @@ pub struct AccountSave {
 pub enum AccountLoadError {
     /// Internal Error.
     #[error(transparent)]
-    InternalError(Error),
+    InternalError(#[from] InternalError),
     /// Xbox Live Error
     #[error(transparent)]
-    XboxLiveError(XSTSError),
+    XboxLiveError(#[from] XSTSError),
     /// Microsoft Error
     #[error(transparent)]
-    MicrosoftError(MicrosoftError),
+    MicrosoftError(#[from] MicrosoftError),
 }
-
-impl From<Error> for AccountLoadError {
-    fn from(error: Error) -> Self {
-        AccountLoadError::InternalError(error)
+impl From<BadResponseOrError<MicrosoftError>> for AccountLoadError {
+    fn from(value: BadResponseOrError<MicrosoftError>) -> Self {
+        match value {
+            BadResponseOrError::Error(err) => AccountLoadError::InternalError(err),
+            BadResponseOrError::ResponseError(micro) => AccountLoadError::MicrosoftError(micro),
+        }
     }
 }
-
-impl From<XSTSError> for AccountLoadError {
-    fn from(error: XSTSError) -> Self {
-        AccountLoadError::XboxLiveError(error)
+impl From<BadResponseOrError<XSTSError>> for AccountLoadError {
+    fn from(value: BadResponseOrError<XSTSError>) -> Self {
+        match value {
+            BadResponseOrError::Error(err) => AccountLoadError::InternalError(err),
+            BadResponseOrError::ResponseError(micro) => AccountLoadError::XboxLiveError(micro),
+        }
     }
 }
-
-impl From<MicrosoftError> for AccountLoadError {
-    fn from(error: MicrosoftError) -> Self {
-        AccountLoadError::MicrosoftError(error)
-    }
-}
-
-impl APIClientWithAuth {
+impl AuthenticationClient {
     /// Creates a based on the AAuthorization Response from Microsoft
     /// # Errors
     /// Read the docs on [AccountLoadError](AccountLoadError)
@@ -61,9 +57,21 @@ impl APIClientWithAuth {
         auth: AuthorizationTokenResponse,
     ) -> Result<AccountSave, AccountLoadError> {
         debug!("Acquiring a Xbox Live Token");
-        let xbox_save = self.authenticate_xbl(&auth.access_token).await??;
+        let xbox_save = match self.authenticate_xbl(&auth.access_token).await {
+            Ok(ok) => ok,
+            Err(err) => {
+                error!(?err, "Could not get Xbox Token");
+                return Err(AccountLoadError::from(err));
+            }
+        };
         debug!("Acquiring the XSTS token");
-        let xsts = self.authenticate_xsts(&xbox_save.token).await??;
+        let xsts = match self.authenticate_xsts(&xbox_save.token).await {
+            Ok(ok) => ok,
+            Err(err) => {
+                error!(?err, "Could not get XSTS Token");
+                return Err(AccountLoadError::from(err));
+            }
+        };
         debug!("Acquiring the Minecraft Token");
         let minecraft = self
             .authenticate_minecraft(xsts.get_user_hash_unsafe(), &xsts.token)
@@ -85,16 +93,16 @@ impl APIClientWithAuth {
             if account.xbox.expires <= current_time {
                 debug!("Xbox Token Expired.");
                 debug!("Acquiring a access_token from Microsoft");
-                let response = RefreshToken::new(&self)
+                let response = RefreshToken::new(self.clone())
                     .refresh_token(&account.microsoft_token.refresh_token)
-                    .await??;
+                    .await?;
                 account.microsoft_token.refresh_token = response.refresh_token;
                 debug!("Acquiring a new Xbox Live Token");
-                let ok = self.authenticate_xbl(&response.access_token).await??;
+                let ok = self.authenticate_xbl(&response.access_token).await?;
                 account.xbox = ok.into();
             }
             debug!("Acquiring the XSTS token");
-            let xsts = self.authenticate_xsts(&account.xbox.token).await??;
+            let xsts = self.authenticate_xsts(&account.xbox.token).await?;
             debug!("Acquiring the Minecraft Token");
             let minecraft = self
                 .authenticate_minecraft(xsts.get_user_hash_unsafe(), &xsts.token)
@@ -107,7 +115,7 @@ impl APIClientWithAuth {
 }
 
 /// The parts saved of the Microsoft Token
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct MicrosoftToken {
     pub refresh_token: String,
 }
@@ -121,7 +129,7 @@ impl From<AuthorizationTokenResponse> for MicrosoftToken {
 }
 
 /// Xbox User save
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct XboxUserSave {
     pub expires: DateTime<Utc>,
     pub token: String,
@@ -142,7 +150,7 @@ impl From<XboxLiveResponse> for XboxUserSave {
 }
 
 /// The Minecraft Auth Token
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct MinecraftSave {
     /// Then it expires
     pub expires: DateTime<Utc>,
