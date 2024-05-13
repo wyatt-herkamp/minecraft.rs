@@ -1,13 +1,12 @@
-use std::ops::Deref;
-use std::sync::Arc;
+use std::{ops::Deref, sync::Arc};
+
+use game_files::GameFilesAPIBuilder;
+use reqwest::{header::ACCEPT, Client, RequestBuilder};
+use serde::de::DeserializeOwned;
+use tracing::{debug, trace};
 
 pub use crate::error::Error;
 use crate::http::IntoResult;
-use game_files::GameFilesAPIBuilder;
-use reqwest::header::ACCEPT;
-use reqwest::{Client, RequestBuilder};
-use serde::de::DeserializeOwned;
-use tracing::{debug, trace};
 
 pub mod error;
 pub mod game_files;

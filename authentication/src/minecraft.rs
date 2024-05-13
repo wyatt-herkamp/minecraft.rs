@@ -1,10 +1,10 @@
 use std::fmt::Display;
 
-use crate::{AuthenticationClient, InternalError};
-use reqwest::header::CONTENT_TYPE;
-use reqwest::Body;
+use reqwest::{header::CONTENT_TYPE, Body};
 use serde::{ser::SerializeStruct, Deserialize, Serialize};
 use tracing::debug;
+
+use crate::{AuthenticationClient, InternalError};
 static LOGIN_WITH_XBOX: &str = "https://api.minecraftservices.com/authentication/login_with_xbox";
 #[derive(Deserialize, Debug)]
 pub struct MinecraftLoginResponse {

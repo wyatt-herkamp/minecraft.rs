@@ -1,15 +1,17 @@
-use serde::Deserialize;
-use std::collections::HashMap;
-use std::path::PathBuf;
+use std::{collections::HashMap, path::PathBuf};
 
-use crate::game_files::assets::{content_hash, file_path, Asset};
-use crate::utils::download::{Download, DownloadToFile};
-use crate::{APIClient, Error};
+use serde::{Deserialize, Serialize};
 use tokio::fs::create_dir_all;
+
+use crate::{
+    game_files::assets::{content_hash, file_path, Asset},
+    utils::download::{Download, DownloadToFile},
+    APIClient, Error,
+};
 
 /// The Asset File
 /// Asset File Example 1.19 ['{launcher_meta}/v1/packages/c76d769e6bf9c90a7ffff1481a05563777356749/1.19.json'](https://launchermeta.mojang.com/v1/packages/c76d769e6bf9c90a7ffff1481a05563777356749/1.19.json)
-#[derive(Deserialize, Debug)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct AssetFile {
     /// Will be found true on legacy versions.
     #[serde(default)]
@@ -18,7 +20,7 @@ pub struct AssetFile {
 }
 
 /// Object found in the Map of the [AssetFile](AssetFile)
-#[derive(Deserialize, Clone, Debug)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct AssetResponse {
     pub hash: String,
     pub size: u32,
@@ -26,13 +28,8 @@ pub struct AssetResponse {
 
 impl AssetFile {
     /// Get an Asset from the the AssetFile
-    pub fn get_asset<'a, S: AsRef<str>>(
-        &self,
-        client: &'a APIClient,
-        name: S,
-    ) -> Option<Asset<'a>> {
+    pub fn get_asset<'a, S: AsRef<str>>(&self, name: S) -> Option<Asset> {
         self.objects.get(name.as_ref()).map(|value| Asset {
-            client,
             data: value.clone(),
             name: name.as_ref().to_string(),
         })
@@ -42,9 +39,9 @@ impl AssetFile {
     /// Returns a HashMap<String, [DownloadFile](crate::utils::download::DownloadFile<'a>)> Key is the hash of the file
     pub async fn download(
         self,
-        client: &APIClient,
+        client: APIClient,
         asset_dir: PathBuf,
-    ) -> Result<HashMap<String, DownloadToFile<'_>>, Error> {
+    ) -> Result<HashMap<String, DownloadToFile>, Error> {
         let mut downloads = HashMap::new();
         if !asset_dir.exists() {
             create_dir_all(&asset_dir).await?;
@@ -75,7 +72,7 @@ impl AssetFile {
                     Download {
                         url,
                         file_size: response.size as usize,
-                        client,
+                        client: client.clone(),
                     },
                     asset_file,
                 ),

@@ -1,23 +1,25 @@
-use std::fmt::{Debug, Formatter};
+use std::{
+    fmt::{Debug, Formatter},
+    path::PathBuf,
+};
 
 use reqwest::{Response, Url};
-use std::path::PathBuf;
 
 use crate::{APIClient, Error};
 
 /// A generic Download handler and type
 /// Contains a Response that we wrap to to make file downloading easy
 #[derive(Clone)]
-pub struct Download<'a> {
+pub struct Download {
     /// URL to the download
     pub(crate) url: Url,
     /// The number of bytes the download is
     pub file_size: usize,
     /// A Reference to the API Client
-    pub(crate) client: &'a APIClient,
+    pub(crate) client: APIClient,
 }
 
-impl Download<'_> {
+impl Download {
     /// Downloads a file. If the file already exists. it will be overwritten
     pub async fn download(self, location: PathBuf) -> Result<(), Error> {
         self.download_with_subscriber(location, |_| {}).await
@@ -50,7 +52,7 @@ impl Download<'_> {
     }
 }
 
-impl Debug for Download<'_> {
+impl Debug for Download {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -63,12 +65,12 @@ impl Debug for Download<'_> {
 
 /// This is a [Download](Download) with a [PathBuf](std::path::PathBuf)
 #[derive(Clone)]
-pub struct DownloadToFile<'a> {
+pub struct DownloadToFile {
     pub(crate) location: PathBuf,
-    pub(crate) download: Download<'a>,
+    pub(crate) download: Download,
 }
-impl DownloadToFile<'_> {
-    pub(crate) fn new(download: Download<'_>, location: PathBuf) -> DownloadToFile {
+impl DownloadToFile {
+    pub(crate) fn new(download: Download, location: PathBuf) -> DownloadToFile {
         DownloadToFile { location, download }
     }
     /// Downloads a file. If the file already exists. it will be overwritten
@@ -91,7 +93,7 @@ impl DownloadToFile<'_> {
     }
 }
 
-impl Debug for DownloadToFile<'_> {
+impl Debug for DownloadToFile {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?} to location {:?}", self.download, self.location)
     }

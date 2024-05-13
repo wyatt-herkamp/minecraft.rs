@@ -1,7 +1,8 @@
-use serde::Deserialize;
 use std::fmt::{Display, Formatter};
 
-#[derive(Deserialize, Debug)]
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Hash, PartialEq, Eq)]
 pub enum VersionType {
     #[serde(rename = "snapshot")]
     Snapshot,

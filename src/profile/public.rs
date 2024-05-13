@@ -1,4 +1,4 @@
-use std::str::{self, FromStr};
+use std::str::{self};
 
 use base64::{engine::general_purpose::STANDARD, Engine};
 use serde::Deserialize;
@@ -15,10 +15,12 @@ pub struct GameProfileTextureMetadata {
     model: Model,
 }
 mod deserialize_metadata {
-    use serde::de::{Error, Visitor};
-    use serde::{Deserialize, Deserializer};
-    use std::fmt::Formatter;
-    use std::marker::PhantomData;
+    use std::{fmt::Formatter, marker::PhantomData};
+
+    use serde::{
+        de::{Error, Visitor},
+        Deserialize, Deserializer,
+    };
 
     pub struct MetadataVisitor<'de> {
         phantom: PhantomData<&'de ()>,
@@ -114,12 +116,15 @@ impl<'de> TryFrom<&'de [u8]> for GameProfileTextures {
 }
 
 mod deserialize_textures {
-    use super::{GameProfileTexture, GameProfileTextures};
-    use serde::de::{Error, Visitor};
-    use serde::{Deserialize, Deserializer};
+    use std::{fmt::Formatter, marker::PhantomData};
+
+    use serde::{
+        de::{Error, Visitor},
+        Deserialize, Deserializer,
+    };
     use serde_json::Value;
-    use std::fmt::Formatter;
-    use std::marker::PhantomData;
+
+    use super::{GameProfileTexture, GameProfileTextures};
 
     struct InnerTextures {
         skin: Option<GameProfileTexture>,
@@ -221,10 +226,12 @@ pub struct GameProfile {
     pub textures: GameProfileTextures,
 }
 mod deserialize_game_profile {
-    use serde::de::{Error, MapAccess, Visitor};
-    use serde::{Deserialize, Deserializer};
-    use std::fmt::Formatter;
-    use std::marker::PhantomData;
+    use std::{fmt::Formatter, marker::PhantomData};
+
+    use serde::{
+        de::{Error, MapAccess, Visitor},
+        Deserialize, Deserializer,
+    };
     use uuid::Uuid;
 
     use super::{GameProfile, GameProfileProperty, GameProfileTextures};

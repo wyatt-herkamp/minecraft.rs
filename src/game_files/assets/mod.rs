@@ -1,25 +1,29 @@
-use crate::game_files::assets::asset_download::AssetDownload;
-use crate::game_files::assets::data::AssetResponse;
-use crate::utils::download::Download;
-use crate::{APIClient, Error};
 use std::path::PathBuf;
+
+use crate::{
+    game_files::assets::{asset_download::AssetDownload, data::AssetResponse},
+    utils::download::Download,
+    APIClient, Error,
+};
 
 pub mod asset_download;
 pub mod data;
 
 /// Release contains a reference to the APIClient and the internal data gotten from the asset
-pub struct Asset<'a> {
-    pub(crate) client: &'a APIClient,
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Asset {
     pub data: AssetResponse,
     pub name: String,
 }
 
-impl<'a> Asset<'a> {
+impl Asset {
     /// Creates an Asset Download for downloading assets
-    pub async fn download(&self) -> Result<AssetDownload<'_, Download<'_>>, Error> {
+    pub async fn download(
+        &self,
+        api_client: APIClient,
+    ) -> Result<AssetDownload<'_, Download>, Error> {
         let sub = content_hash(&self.data.hash);
-        let url = self
-            .client
+        let url = api_client
             .game_files
             .create_resource_url(format!("{}/{}", sub, &self.data.hash));
         Ok(AssetDownload {
@@ -27,7 +31,7 @@ impl<'a> Asset<'a> {
             download: Download {
                 url,
                 file_size: self.data.size as usize,
-                client: self.client,
+                client: api_client,
             },
         })
     }

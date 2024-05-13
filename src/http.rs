@@ -1,8 +1,11 @@
-use crate::error;
-use crate::error::Error;
-use reqwest::header::{HeaderMap, HeaderName};
-use reqwest::{Response, StatusCode};
 use std::str::FromStr;
+
+use reqwest::{
+    header::{HeaderMap, HeaderName},
+    Response, StatusCode,
+};
+
+use crate::{error, error::Error};
 
 pub trait IntoResult {
     async fn into_result<E: ResponseError>(self) -> Result<Response, E>;

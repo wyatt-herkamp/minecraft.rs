@@ -1,7 +1,11 @@
-use crate::game_files::release::data::ReleaseData;
-use crate::game_files::release::rule::{Rule, RuleType};
-use serde::Deserialize;
 use std::collections::HashMap;
+
+use serde::{Deserialize, Serialize};
+
+use crate::game_files::release::{
+    data::ReleaseData,
+    rule::{Rule, RuleType},
+};
 
 impl ReleaseData {
     pub fn get_libraries_to_download(
@@ -39,7 +43,7 @@ impl ReleaseData {
     }
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Library {
     pub downloads: LibraryDownloads,
     pub name: String,
@@ -48,22 +52,22 @@ pub struct Library {
     pub natives: Option<HashMap<String, String>>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Artifact {
     pub sha1: String,
-    pub size: u32,
+    pub size: u64,
     pub url: String,
     pub path: String,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct LibraryDownloads {
     pub artifact: Option<Artifact>,
     #[serde(default)]
     pub classifiers: HashMap<String, Artifact>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct LibraryExtract {
     pub exclude: Vec<String>,
 }

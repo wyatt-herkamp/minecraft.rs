@@ -1,10 +1,12 @@
 use crate::Error;
-
-use reqwest::{Client, Url};
+pub(crate) mod serde_utils;
 use std::path::PathBuf;
 
-use tokio::fs::{create_dir_all, OpenOptions};
-use tokio::io::AsyncWriteExt;
+use reqwest::{Client, Url};
+use tokio::{
+    fs::{create_dir_all, OpenOptions},
+    io::AsyncWriteExt,
+};
 
 pub mod download;
 pub async fn download_with_subscriber<F>(

@@ -5,11 +5,11 @@ pub mod version_type;
 
 use std::borrow::Cow;
 
-use crate::{APIClient, Error};
-use reqwest::{RequestBuilder, Url};
+use reqwest::Url;
 use serde::{Deserialize, Serialize};
 
 use self::version_manifest::VersionManifest;
+use crate::{APIClient, Error};
 pub static RESOURCE_URL_BASE: &str = "https://resources.download.minecraft.net";
 pub static LIBRARY_URL_BASE: &str = "https://libraries.minecraft.net";
 pub static LAUNCHER_META_URL_BASE: &str = "https://piston-meta.mojang.com";
@@ -60,6 +60,10 @@ impl GameFilesAPIBuilder {
 }
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
+
+    use tokio::time::sleep;
+
     #[tokio::test]
     async fn version_manifest_v2() -> anyhow::Result<()> {
         let client = crate::test::setup();
@@ -71,5 +75,45 @@ mod tests {
         Ok(())
     }
 
+    #[tokio::test]
+    async fn parse_version_latest_releases() -> anyhow::Result<()> {
+        let client = crate::test::setup();
+        let version_manifest = client.version_manifest().await?;
+        println!("Latest Release Info {:#?}", version_manifest.latest);
+        let snapshot = version_manifest
+            .get_latest_snapshot()
+            .get_release(&client)
+            .await?;
+        println!("Snapshot Release Info {:#?}", snapshot);
+        let release = version_manifest
+            .get_latest_release()
+            .get_release(&client)
+            .await?;
+        println!("Stable Release Info {:#?}", release);
 
+        Ok(())
+    }
+    #[ignore = "We will be making a lot of requests to Mojank"]
+    #[tokio::test]
+    async fn parse_version_all_releases() -> anyhow::Result<()> {
+        let client = crate::test::setup();
+        let version_manifest = client.version_manifest().await?;
+        println!("Latest Release Info {:#?}", version_manifest.latest);
+        for version in &version_manifest.versions {
+            match version.get_release(&client).await {
+                Ok(ok) => {
+                    println!("Version Parsed {ok:#?}")
+                }
+                Err(err) => {
+                    eprintln!(
+                        "Could not read release data from {:?} \n Error \n {err:#?}",
+                        version
+                    );
+                }
+            }
+            sleep(Duration::from_secs(1)).await
+        }
+
+        Ok(())
+    }
 }

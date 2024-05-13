@@ -1,17 +1,21 @@
 use std::path::PathBuf;
 
-use crate::game_files::assets::{content_hash, file_path, Asset};
-use crate::utils::download::{Download, DownloadToFile};
-use crate::Error;
 use tokio::fs::create_dir_all;
 
+use crate::{
+    game_files::assets::{content_hash, file_path, Asset},
+    utils::download::{Download, DownloadToFile},
+    Error,
+};
+
 /// A wrap around the Download type to allow you to specific just a asset directory. Instead of the entire type
+#[derive(Debug)]
 pub struct AssetDownload<'a, D> {
-    pub(crate) asset: &'a Asset<'a>,
+    pub(crate) asset: &'a Asset,
     pub(crate) download: D,
 }
 
-impl AssetDownload<'_, Download<'_>> {
+impl AssetDownload<'_, Download> {
     /// Downloads a file. If the file already exists. it will be overwritten
     /// `asset_dir` is the directory to download assets to
     pub async fn download(self, asset_dir: PathBuf, map_to_resources: bool) -> Result<(), Error> {
@@ -46,7 +50,7 @@ impl AssetDownload<'_, Download<'_>> {
     }
 }
 
-impl AssetDownload<'_, DownloadToFile<'_>> {
+impl AssetDownload<'_, DownloadToFile> {
     /// Downloads a file. If the file already exists. it will be overwritten
     /// `asset_dir` is the directory to download assets to
     pub async fn download(self, map_to_resources: bool) -> Result<(), Error> {
@@ -78,8 +82,8 @@ impl AssetDownload<'_, DownloadToFile<'_>> {
     }
 }
 
-impl<'a> Into<Download<'a>> for AssetDownload<'a, Download<'a>> {
-    fn into(self) -> Download<'a> {
+impl<'a> Into<Download> for AssetDownload<'a, Download> {
+    fn into(self) -> Download {
         self.download
     }
 }

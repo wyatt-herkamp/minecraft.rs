@@ -1,13 +1,15 @@
-use crate::error::{BadResponseOrError, IntoResult, ResponseError};
-use crate::utils::query_string_builder::QueryString;
-use crate::{AuthProperties, AuthenticationClient, InternalError};
 use reqwest::header::{ACCEPT, CONTENT_TYPE};
+
+use crate::{
+    error::{BadResponseOrError, IntoResult, ResponseError},
+    utils::query_string_builder::QueryString,
+    AuthProperties, AuthenticationClient, InternalError,
+};
 pub mod device;
+use std::{fmt::Debug, ops::Deref};
+
 use reqwest::{Body, IntoUrl, Response, StatusCode};
-use serde::de::DeserializeOwned;
-use serde::{Deserialize, Serialize};
-use std::fmt::Debug;
-use std::ops::Deref;
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use tracing::{debug, error};
 pub mod grant;
 

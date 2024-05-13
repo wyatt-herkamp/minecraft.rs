@@ -1,13 +1,17 @@
-use crate::error::{BadResponseOrError, ResponseError};
-use crate::microsoft::{AuthorizationTokenResponse, MicrosoftError, RefreshToken};
-use crate::minecraft::MinecraftLoginResponse;
-use crate::xbox::{XSTSError, XboxLiveResponse};
-use crate::{AuthenticationClient, InternalError};
+use std::ops::Add;
+
 use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
-use std::ops::Add;
 use thiserror::Error;
 use tracing::{debug, error};
+
+use crate::{
+    error::{BadResponseOrError, ResponseError},
+    microsoft::{AuthorizationTokenResponse, MicrosoftError, RefreshToken},
+    minecraft::MinecraftLoginResponse,
+    xbox::{XSTSError, XboxLiveResponse},
+    AuthenticationClient, InternalError,
+};
 
 /// This structure gives an easy way to get the Minecraft token without you having to call all the functions again
 /// it only stores the Refresh Token from Microsoft(Unknown Life Span), Xbox Token(14 days), Minecraft Token(24 hours)

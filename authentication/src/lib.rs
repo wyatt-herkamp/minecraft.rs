@@ -13,8 +13,9 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use utils::BetterResponseToJson;
 pub use xbox::*;
 pub mod error;
-pub use crate::error::InternalError;
 use tracing::error;
+
+pub use crate::error::InternalError;
 pub(crate) mod utils;
 #[derive(Clone, Debug)]
 pub struct AuthenticationClient(pub(crate) Arc<InnerAuthenticationClient>);

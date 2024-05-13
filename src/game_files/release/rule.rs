@@ -1,11 +1,10 @@
-use serde::de::{MapAccess, Visitor};
-use serde::{de, Deserialize, Deserializer};
-use tracing::warn;
-
 use std::collections::HashMap;
 
+use serde::{Deserialize, Serialize};
+use tracing::warn;
+
 /// The Rule Type
-#[derive(Deserialize, Debug)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum RuleType {
     /// States the action will be preformed if the Rule requirements are met
@@ -15,7 +14,7 @@ pub enum RuleType {
 }
 
 /// Rule Requirements
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RuleRequirement {
     /// OS Requirements
     OS(Vec<RuleOS>),
@@ -24,7 +23,7 @@ pub enum RuleRequirement {
 }
 
 /// The OS Requirement
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub enum RuleOS {
     /// OS Name
     Name(String),
@@ -35,10 +34,9 @@ pub enum RuleOS {
     /// A Catch All
     Other { key: String, value: String },
 }
-
 /// Sets the rules for the [Argument](Argument) or [Library](Library)
 /// Custom Deserialization done
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Rule {
     /// What is to happen on if the requirements are met
     pub action: RuleType,
@@ -93,74 +91,115 @@ impl Rule {
         true
     }
 }
+mod _serde {
+    use std::collections::HashMap;
 
-impl<'de> Deserialize<'de> for Rule {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        struct RuleVisitor;
-        #[derive(Deserialize)]
-        #[serde(field_identifier, rename_all = "lowercase")]
-        enum Field {
-            Action,
-            Os,
-            Features,
-        }
+    use serde::{
+        de,
+        de::{MapAccess, Visitor},
+        ser::{Serialize, SerializeStruct, Serializer},
+        Deserialize, Deserializer,
+    };
 
-        impl<'de> Visitor<'de> for RuleVisitor {
-            type Value = Rule;
-
-            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-                formatter.write_str("Expecting Rule Type")
+    use super::{Rule, RuleOS, RuleRequirement};
+    use crate::game_files::release::rule::RuleType;
+    impl Serialize for Rule {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            let mut ser_struct = serializer.serialize_struct("rule", 2)?;
+            ser_struct.serialize_field("action", &self.action)?;
+            match &self.requirement {
+                RuleRequirement::OS(os) => {
+                    let mut map = HashMap::<&str, &str>::new();
+                    for rule in os {
+                        match rule {
+                            RuleOS::Name(name) => map.insert("name", name),
+                            RuleOS::Arch(arch) => map.insert("arch", arch),
+                            RuleOS::Version(version) => map.insert("version", version),
+                            RuleOS::Other { key, value } => map.insert(key, value),
+                        };
+                    }
+                    ser_struct.serialize_field("os", &map)?;
+                }
+                RuleRequirement::Features(features) => {
+                    ser_struct.serialize_field("features", &features)?;
+                }
             }
 
-            fn visit_map<V>(self, mut map: V) -> Result<Rule, V::Error>
-            where
-                V: MapAccess<'de>,
-            {
-                let mut action: Option<RuleType> = None;
-                let mut requirement: Option<RuleRequirement> = None;
-                while let Some(key) = map.next_key()? {
-                    match key {
-                        Field::Action => {
-                            if action.is_some() {
-                                return Err(de::Error::duplicate_field("action"));
-                            }
+            return ser_struct.end();
+        }
+    }
 
-                            action = Some(map.next_value()?);
-                        }
+    impl<'de> Deserialize<'de> for Rule {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            struct RuleVisitor;
+            #[derive(Deserialize)]
+            #[serde(field_identifier, rename_all = "lowercase")]
+            enum Field {
+                Action,
+                Os,
+                Features,
+            }
 
-                        Field::Os => {
-                            let value: HashMap<String, String> = map.next_value()?;
-                            let mut os = Vec::new();
-                            for (key, value) in value {
-                                match key.as_str() {
-                                    "name" => os.push(RuleOS::Name(value)),
-                                    "version" => os.push(RuleOS::Version(value)),
-                                    "arch" => os.push(RuleOS::Arch(value)),
-                                    _ => os.push(RuleOS::Other { key, value }),
+            impl<'de> Visitor<'de> for RuleVisitor {
+                type Value = Rule;
+
+                fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                    formatter.write_str("Expecting Rule Type")
+                }
+
+                fn visit_map<V>(self, mut map: V) -> Result<Rule, V::Error>
+                where
+                    V: MapAccess<'de>,
+                {
+                    let mut action: Option<RuleType> = None;
+                    let mut requirement: Option<RuleRequirement> = None;
+                    while let Some(key) = map.next_key()? {
+                        match key {
+                            Field::Action => {
+                                if action.is_some() {
+                                    return Err(de::Error::duplicate_field("action"));
                                 }
+
+                                action = Some(map.next_value()?);
                             }
-                            let r = RuleRequirement::OS(os);
-                            requirement = Some(r)
-                        }
-                        Field::Features => {
-                            let r = RuleRequirement::Features(map.next_value()?);
-                            requirement = Some(r)
+
+                            Field::Os => {
+                                let value: HashMap<String, String> = map.next_value()?;
+                                let mut os = Vec::new();
+                                for (key, value) in value {
+                                    match key.as_str() {
+                                        "name" => os.push(RuleOS::Name(value)),
+                                        "version" => os.push(RuleOS::Version(value)),
+                                        "arch" => os.push(RuleOS::Arch(value)),
+                                        _ => os.push(RuleOS::Other { key, value }),
+                                    }
+                                }
+                                let r = RuleRequirement::OS(os);
+                                requirement = Some(r)
+                            }
+                            Field::Features => {
+                                let r = RuleRequirement::Features(map.next_value()?);
+                                requirement = Some(r)
+                            }
                         }
                     }
+                    let action = action.ok_or_else(|| de::Error::missing_field("action"))?;
+                    let requirement =
+                        requirement.ok_or_else(|| de::Error::missing_field("requirement"))?;
+                    Ok(Rule {
+                        action,
+                        requirement,
+                    })
                 }
-                let action = action.ok_or_else(|| de::Error::missing_field("action"))?;
-                let requirement =
-                    requirement.ok_or_else(|| de::Error::missing_field("requirement"))?;
-                Ok(Rule {
-                    action,
-                    requirement,
-                })
             }
-        }
 
-        deserializer.deserialize_any(RuleVisitor {})
+            deserializer.deserialize_any(RuleVisitor {})
+        }
     }
 }

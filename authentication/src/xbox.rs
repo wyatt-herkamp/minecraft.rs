@@ -1,16 +1,17 @@
-use crate::error::{BadResponseOrError, IntoResult, ResponseError};
-use crate::utils::BetterResponseToJson;
-use crate::{AuthenticationClient, InternalError, ACCEPT};
-use chrono::{DateTime, Utc};
-use reqwest::header::CONTENT_TYPE;
-
-use reqwest::{Body, IntoUrl, Response, StatusCode};
-use serde::de::DeserializeOwned;
-use serde::{Deserialize, Serialize};
-use serde_json::json;
 use std::fmt::Debug;
+
+use chrono::{DateTime, Utc};
+use reqwest::{header::CONTENT_TYPE, Body, IntoUrl, Response, StatusCode};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde_json::json;
 use thiserror::Error;
 use tracing::{debug, error};
+
+use crate::{
+    error::{BadResponseOrError, IntoResult, ResponseError},
+    utils::BetterResponseToJson,
+    AuthenticationClient, InternalError, ACCEPT,
+};
 #[derive(Debug, Clone, Error)]
 #[error("{response}")]
 pub struct XSTSError {

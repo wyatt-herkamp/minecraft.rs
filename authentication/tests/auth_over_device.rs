@@ -10,7 +10,7 @@ use minecraft_authentication::{
 use reqwest::Client;
 use tokio::time::sleep;
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
-
+#[ignore = "Requires User Input"]
 #[tokio::test]
 async fn test_login() -> anyhow::Result<()> {
     match dotenv::from_filename("authentication.test.env") {

@@ -1,10 +1,11 @@
-use crate::error::{BadResponseOrError, InternalError};
-use crate::{
-    utils::query_string_builder::QueryString, AuthProperties, AuthorizationTokenResponse,
-    MicrosoftAuthorization, MicrosoftAuthorizationType, MICROSOFT_LOGIN_URL, MICROSOFT_SCOPE,
-};
-use crate::{AuthenticationClient, MicrosoftError};
 use url::Url;
+
+use crate::{
+    error::{BadResponseOrError, InternalError},
+    utils::query_string_builder::QueryString,
+    AuthProperties, AuthenticationClient, AuthorizationTokenResponse, MicrosoftAuthorization,
+    MicrosoftAuthorizationType, MicrosoftError, MICROSOFT_LOGIN_URL, MICROSOFT_SCOPE,
+};
 
 /// Grant Code follows the Microsoft Authentication Schema [Here](https://docs.microsoft.com/en-us/azure/active-directory/develop/v2-oauth2-auth-code-flow)
 /// Requires the redirect url to be set
