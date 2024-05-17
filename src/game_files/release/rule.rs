@@ -20,6 +20,7 @@ pub enum RuleRequirement {
     OS(Vec<RuleOS>),
     /// Features enabled
     Features(HashMap<String, bool>),
+    Default,
 }
 
 /// The OS Requirement
@@ -97,7 +98,7 @@ mod _serde {
     use serde::{
         de,
         de::{MapAccess, Visitor},
-        ser::{Serialize, SerializeStruct, Serializer},
+        ser::{Serialize, SerializeMap, Serializer},
         Deserialize, Deserializer,
     };
 
@@ -108,8 +109,8 @@ mod _serde {
         where
             S: Serializer,
         {
-            let mut ser_struct = serializer.serialize_struct("rule", 2)?;
-            ser_struct.serialize_field("action", &self.action)?;
+            let mut ser_struct = serializer.serialize_map(Some(2))?;
+            ser_struct.serialize_entry("action", &self.action)?;
             match &self.requirement {
                 RuleRequirement::OS(os) => {
                     let mut map = HashMap::<&str, &str>::new();
@@ -121,11 +122,12 @@ mod _serde {
                             RuleOS::Other { key, value } => map.insert(key, value),
                         };
                     }
-                    ser_struct.serialize_field("os", &map)?;
+                    ser_struct.serialize_entry("os", &map)?;
                 }
                 RuleRequirement::Features(features) => {
-                    ser_struct.serialize_field("features", &features)?;
+                    ser_struct.serialize_entry("features", &features)?;
                 }
+                _ => {}
             }
 
             return ser_struct.end();
@@ -190,8 +192,7 @@ mod _serde {
                         }
                     }
                     let action = action.ok_or_else(|| de::Error::missing_field("action"))?;
-                    let requirement =
-                        requirement.ok_or_else(|| de::Error::missing_field("requirement"))?;
+                    let requirement = requirement.unwrap_or(RuleRequirement::Default);
                     Ok(Rule {
                         action,
                         requirement,

@@ -93,6 +93,20 @@ mod tests {
 
         Ok(())
     }
+    #[tokio::test]
+    async fn legacy_tests() -> anyhow::Result<()> {
+        let client = crate::test::setup();
+        let version_manifest = client.version_manifest().await?;
+        println!("Latest Release Info {:#?}", version_manifest.latest);
+        let snapshot = version_manifest
+            .get_version("1.7.10")
+            .unwrap()
+            .get_release(&client)
+            .await?;
+        println!("1.7.10 Release Info {:#?}", snapshot);
+
+        Ok(())
+    }
     #[ignore = "We will be making a lot of requests to Mojank"]
     #[tokio::test]
     async fn parse_version_all_releases() -> anyhow::Result<()> {
@@ -111,7 +125,7 @@ mod tests {
                     );
                 }
             }
-            sleep(Duration::from_secs(1)).await
+            //sleep(Duration::from_secs(1)).await
         }
 
         Ok(())
